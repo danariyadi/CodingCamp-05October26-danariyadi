@@ -1,4 +1,4 @@
-/**
+﻿/**
  * To-Do Life Dashboard
  * Vanilla JavaScript application using Module Pattern with IIFE
  * All modules are encapsulated and communicate through public interfaces
@@ -343,9 +343,7 @@ const ThemeManager = (function() {
     function updateThemeIcon(theme) {
         const themeIcon = document.querySelector('.theme-icon');
         if (themeIcon) {
-            // Moon icon for light mode (clicking will go to dark)
-            // Sun icon for dark mode (clicking will go to light)
-            themeIcon.textContent = theme === THEMES.LIGHT ? '🌙' : '☀️';
+            themeIcon.textContent = theme === THEMES.LIGHT ? 'MODE GELAP' : 'MODE TERANG';
         }
     }
 
@@ -423,89 +421,51 @@ const ThemeManager = (function() {
 })();
 
 /* ============================================
-   GreetingComponent Module
-   Displays real-time clock, date, and personalized greeting
+   GreetingComponent
    ============================================ */
 const GreetingComponent = (function() {
-    // Module implementation will be added in Task 5.1
-    return {
-        init: function(containerSelector) {},
-        updateTime: function() {},
-        setName: function(name) {},
-        getName: function() { return null; },
-        getGreeting: function() { return 'Selamat Datang'; }
-    };
+    const NAME_KEY = 'todo_dashboard_name'; let timeNode, dateNode, messageNode, nameNode, clockId;
+    function updateTime() { const now = new Date(); if (timeNode) timeNode.textContent = now.toLocaleTimeString('id-ID', { hour12: false }); if (dateNode) dateNode.textContent = now.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }); if (messageNode) { const h = now.getHours(); messageNode.textContent = h < 11 ? 'Selamat Pagi' : h < 15 ? 'Selamat Siang' : h < 18 ? 'Selamat Sore' : 'Selamat Malam'; } }
+    function setName(name) { const value = String(name || '').trim().slice(0, 60); if (nameNode) nameNode.textContent = value; StorageManager.set(NAME_KEY, value); }
+    function init() { timeNode = document.getElementById('time-display'); dateNode = document.getElementById('date-display'); messageNode = document.getElementById('greeting-message'); nameNode = document.getElementById('greeting-name'); if (nameNode) { nameNode.textContent = StorageManager.get(NAME_KEY) || ''; nameNode.contentEditable = 'true'; nameNode.setAttribute('role', 'textbox'); nameNode.setAttribute('aria-label', 'Nama Anda'); nameNode.addEventListener('blur', () => setName(nameNode.textContent)); nameNode.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); nameNode.blur(); } }); } updateTime(); clearInterval(clockId); clockId = setInterval(updateTime, 1000); }
+    return { init, updateTime, setName, getName: () => nameNode ? nameNode.textContent : '', getGreeting: () => messageNode ? messageNode.textContent : 'Selamat Datang' };
 })();
 
-/* ============================================
-   TimerComponent Module
-   Implements Pomodoro timer with countdown functionality
-   ============================================ */
 const TimerComponent = (function() {
-    // Module implementation will be added in Task 6.1
-    return {
-        init: function(containerSelector) {},
-        start: function() {},
-        stop: function() {},
-        reset: function() {},
-        setDuration: function(minutes) {},
-        getTimeRemaining: function() { return 0; }
-    };
+    let display, durationInput, startButton, stopButton, intervalId = null, remaining = 1500;
+    function paint() { if (display) display.textContent = `${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`; }
+    function stop() { if (intervalId !== null) clearInterval(intervalId); intervalId = null; if (startButton) startButton.disabled = false; if (stopButton) stopButton.disabled = true; }
+    function setDuration(minutes) { const n = Number(minutes); if (!Number.isFinite(n) || n < 1 || n > 120) return false; stop(); remaining = Math.round(n) * 60; if (durationInput) durationInput.value = String(Math.round(n)); paint(); return true; }
+    function start() { if (intervalId !== null) return; if (remaining <= 0) setDuration(durationInput ? durationInput.value : 25); intervalId = setInterval(() => { remaining = Math.max(0, remaining - 1); paint(); if (!remaining) { stop(); NotificationManager.show('Waktu fokus selesai!', 'success'); } }, 1000); if (startButton) startButton.disabled = true; if (stopButton) stopButton.disabled = false; }
+    function reset() { stop(); setDuration(durationInput ? durationInput.value : 25); }
+    function init() { display = document.getElementById('timer-display'); durationInput = document.getElementById('timer-duration'); startButton = document.getElementById('timer-start'); stopButton = document.getElementById('timer-stop'); startButton?.addEventListener('click', start); stopButton?.addEventListener('click', stop); document.getElementById('timer-reset')?.addEventListener('click', reset); durationInput?.addEventListener('change', () => { if (!setDuration(durationInput.value)) { durationInput.value = String(Math.max(1, Math.min(120, Number(durationInput.value) || 25))); setDuration(durationInput.value); } }); paint(); }
+    return { init, start, stop, reset, setDuration, getTimeRemaining: () => remaining };
 })();
 
-/* ============================================
-   TodoComponent Module
-   Manages to-do list CRUD operations
-   ============================================ */
 const TodoComponent = (function() {
-    // Module implementation will be added in Task 8.1
-    return {
-        init: function(containerSelector) {},
-        addTask: function(text) { return false; },
-        editTask: function(id, newText) { return false; },
-        toggleTask: function(id) {},
-        deleteTask: function(id) {},
-        getTasks: function() { return []; },
-        render: function() {}
-    };
+    const KEY = 'todo_dashboard_tasks'; let list, tasks = [];
+    function persist() { StorageManager.set(KEY, tasks); }
+    function render() { if (!list) return; list.replaceChildren(); tasks.forEach(task => { const li = document.createElement('li'); li.className = `todo-item${task.completed ? ' completed' : ''}`; const check = document.createElement('input'); check.type = 'checkbox'; check.className = 'todo-checkbox'; check.checked = task.completed; check.setAttribute('aria-label', 'Tandai selesai'); check.addEventListener('change', () => toggleTask(task.id)); const text = document.createElement('span'); text.className = 'todo-text'; text.textContent = task.text; const actions = document.createElement('div'); actions.className = 'todo-actions'; const edit = document.createElement('button'); edit.className = 'btn btn-secondary btn-icon'; edit.type = 'button'; edit.textContent = '✎'; edit.setAttribute('aria-label', 'Edit task'); edit.addEventListener('click', () => { const value = window.prompt('Edit task:', task.text); if (value !== null) editTask(task.id, value); }); const del = document.createElement('button'); del.className = 'btn btn-secondary btn-icon'; del.type = 'button'; del.textContent = '×'; del.setAttribute('aria-label', 'Hapus task'); del.addEventListener('click', () => deleteTask(task.id)); actions.append(edit, del); li.append(check, text, actions); list.append(li); }); }
+    function addTask(text) { const value = String(text || '').trim(); if (!value) return false; tasks.push({ id: `${Date.now()}-${Math.random()}`, text: value.slice(0, 500), completed: false }); persist(); render(); return true; }
+    function editTask(id, text) { const value = String(text || '').trim(), task = tasks.find(t => t.id === id); if (!task || !value) return false; task.text = value.slice(0, 500); persist(); render(); return true; }
+    function toggleTask(id) { const task = tasks.find(t => t.id === id); if (task) { task.completed = !task.completed; persist(); render(); } }
+    function deleteTask(id) { tasks = tasks.filter(t => t.id !== id); persist(); render(); }
+    function init() { list = document.getElementById('todo-list'); const input = document.getElementById('todo-input'); const add = () => { if (addTask(input.value)) input.value = ''; input.focus(); }; document.getElementById('todo-add')?.addEventListener('click', add); input?.addEventListener('keydown', e => { if (e.key === 'Enter') add(); }); const saved = StorageManager.get(KEY); tasks = Array.isArray(saved) ? saved.filter(t => t && typeof t.text === 'string').map(t => ({ id: t.id || `${Date.now()}-${Math.random()}`, text: t.text, completed: Boolean(t.completed) })) : []; render(); }
+    return { init, addTask, editTask, toggleTask, deleteTask, getTasks: () => tasks.slice(), render };
 })();
 
-/* ============================================
-   LinksComponent Module
-   Manages quick links to favorite websites
-   ============================================ */
 const LinksComponent = (function() {
-    // Module implementation will be added in Task 9.1
-    return {
-        init: function(containerSelector) {},
-        addLink: function(name, url) { return false; },
-        deleteLink: function(id) {},
-        validateUrl: function(url) { return false; },
-        getLinks: function() { return []; },
-        render: function() {}
-    };
+    const KEY = 'todo_dashboard_links'; let grid, links = [];
+    function validateUrl(value) { try { const u = new URL(String(value).trim()); return u.protocol === 'http:' || u.protocol === 'https:'; } catch (_) { return false; } }
+    function render() { if (!grid) return; grid.replaceChildren(); links.forEach(link => { const card = document.createElement('article'); card.className = 'link-card'; const a = document.createElement('a'); a.href = link.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; const name = document.createElement('div'); name.className = 'link-name'; name.textContent = link.name; const url = document.createElement('div'); url.className = 'link-url'; url.textContent = link.url; a.append(name, url); const actions = document.createElement('div'); actions.className = 'link-actions'; const del = document.createElement('button'); del.type = 'button'; del.className = 'btn btn-secondary btn-icon'; del.textContent = '×'; del.setAttribute('aria-label', `Hapus ${link.name}`); del.addEventListener('click', () => deleteLink(link.id)); actions.append(del); card.append(a, actions); grid.append(card); }); }
+    function addLink(name, url) { const label = String(name || '').trim(), address = String(url || '').trim(); if (!label || !validateUrl(address)) return false; links.push({ id: `${Date.now()}-${Math.random()}`, name: label.slice(0, 100), url: address }); StorageManager.set(KEY, links); render(); return true; }
+    function deleteLink(id) { links = links.filter(l => l.id !== id); StorageManager.set(KEY, links); render(); }
+    function init() { grid = document.getElementById('links-grid'); const name = document.getElementById('link-name'), url = document.getElementById('link-url'); const add = () => { if (!addLink(name.value, url.value)) { NotificationManager.show('Isi nama dan URL http/https yang valid.', 'warning'); return; } name.value = ''; url.value = ''; name.focus(); }; document.getElementById('link-add')?.addEventListener('click', add); [name, url].forEach(i => i?.addEventListener('keydown', e => { if (e.key === 'Enter') add(); })); const saved = StorageManager.get(KEY); links = Array.isArray(saved) ? saved.filter(l => l && l.name && validateUrl(l.url)) : []; render(); }
+    return { init, addLink, deleteLink, validateUrl, getLinks: () => links.slice(), render };
 })();
 
-/* ============================================
-   App Module
-   Main application orchestrator
-   ============================================ */
-const App = (function() {
-    // Module implementation will be added in Task 11.1
-    return {
-        init: function() {
-            console.log('To-Do Life Dashboard - Ready for implementation');
-            console.log('Modules initialized (skeleton only)');
-        }
-    };
-})();
-
-/* ============================================
-   Application Entry Point
-   Initialize ThemeManager BEFORE DOM ready to avoid flash
-   Initialize other modules when DOM is ready
-   ============================================ */
-
+const NotificationManager = (function() { function show(message, type = 'info') { const box = document.getElementById('notification-container'); if (!box) return; const node = document.createElement('div'); node.className = `notification notification-${type}`; node.textContent = message; box.append(node); setTimeout(() => node.remove(), 3500); } return { show }; })();
+const App = (function() { function init() { GreetingComponent.init(); TimerComponent.init(); TodoComponent.init(); LinksComponent.init(); } return { init }; })();
 // Initialize theme immediately to avoid flash of unstyled content
 ThemeManager.init();
 
