@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StorageManager Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .pass { color: green; }
+        .fail { color: red; }
+        h2 { margin-top: 0; }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>StorageManager Module Test</h1>
+    
+    <div id="test-results"></div>
+    
+    <script src="js/script.js"></script>
+    <script>
+        // Test suite for StorageManager
+        const results = document.getElementById('test-results');
+        
+        function addResult(testName, passed, details = '') {
+            const section = document.createElement('div');
+            section.className = 'test-section';
+            section.innerHTML = `
+                <h2 class="${passed ? 'pass' : 'fail'}">
+                    ${passed ? '✓' : '✗'} ${testName}
+                </h2>
+                ${details ? `<pre>${details}</pre>` : ''}
+            `;
+            results.appendChild(section);
+        }
+        
+        // Test 1: isAvailable()
+        const isAvailable = StorageManager.isAvailable();
+        addResult(
+            'Test 1: isAvailable() returns boolean',
+            typeof isAvailable === 'boolean',
+            `Result: ${isAvailable}\nExpected: true (in normal browser)`
+        );
+        
+        // Test 2: set() with simple value
+        const setResult = StorageManager.set('test_key', 'test_value');
+        addResult(
+            'Test 2: set() stores simple string',
+            setResult === true,
+            `Result: ${setResult}\nExpected: true`
+        );
+        
+        // Test 3: get() retrieves value
+        const getValue = StorageManager.get('test_key');
+        addResult(
+            'Test 3: get() retrieves stored string',
+            getValue === 'test_value',
+            `Result: "${getValue}"\nExpected: "test_value"`
+        );
+        
+        // Test 4: set() with object (JSON serialization)
+        const testObj = { name: 'Dany', tasks: ['Task 1', 'Task 2'], count: 42 };
+        const setObjResult = StorageManager.set('test_object', testObj);
+        const getObjResult = StorageManager.get('test_object');
+        const objMatch = JSON.stringify(getObjResult) === JSON.stringify(testObj);
+        addResult(
+            'Test 4: set() and get() with object (JSON serialization)',
+            setObjResult && objMatch,
+            `Stored: ${JSON.stringify(testObj, null, 2)}\nRetrieved: ${JSON.stringify(getObjResult, null, 2)}`
+        );
+        
+        // Test 5: set() with array
+        const testArray = [1, 2, 3, { nested: true }];
+        StorageManager.set('test_array', testArray);
+        const getArrayResult = StorageManager.get('test_array');
+        const arrayMatch = JSON.stringify(getArrayResult) === JSON.stringify(testArray);
+        addResult(
+            'Test 5: set() and get() with array',
+            arrayMatch,
+            `Stored: ${JSON.stringify(testArray)}\nRetrieved: ${JSON.stringify(getArrayResult)}`
+        );
+        
+        // Test 6: get() returns null for non-existent key
+        const nonExistent = StorageManager.get('non_existent_key');
+        addResult(
+            'Test 6: get() returns null for non-existent key',
+            nonExistent === null,
+            `Result: ${nonExistent}\nExpected: null`
+        );
+        
+        // Test 7: remove() deletes key
+        StorageManager.set('temp_key', 'temp_value');
+        const removeResult = StorageManager.remove('temp_key');
+        const afterRemove = StorageManager.get('temp_key');
+        addResult(
+            'Test 7: remove() deletes key',
+            removeResult === true && afterRemove === null,
+            `remove() returned: ${removeResult}\nget() after remove: ${afterRemove}\nExpected: null`
+        );
+        
+        // Test 8: getSize() returns number
+        const sizeResult = StorageManager.getSize();
+        addResult(
+            'Test 8: getSize() returns number in bytes',
+            typeof sizeResult === 'number' && sizeResult >= 0,
+            `Result: ${sizeResult} bytes\nExpected: positive number`
+        );
+        
+        // Test 9: Handling invalid key (empty string)
+        const invalidSetResult = StorageManager.set('', 'value');
+        addResult(
+            'Test 9: set() with invalid key (empty string) returns false',
+            invalidSetResult === false,
+            `Result: ${invalidSetResult}\nExpected: false`
+        );
+        
+        // Test 10: Handling invalid key (non-string)
+        const invalidSetResult2 = StorageManager.set(null, 'value');
+        const invalidGetResult = StorageManager.get(123);
+        addResult(
+            'Test 10: set()/get() with invalid key types return false/null',
+            invalidSetResult2 === false && invalidGetResult === null,
+            `set(null, 'value'): ${invalidSetResult2}\nget(123): ${invalidGetResult}\nExpected: false and null`
+        );
+        
+        // Test 11: Handling corrupted JSON data
+        if (StorageManager.isAvailable()) {
+            localStorage.setItem('corrupted_key', '{invalid json}');
+        }
+        const corruptedResult = StorageManager.get('corrupted_key');
+        addResult(
+            'Test 11: get() handles corrupted JSON gracefully',
+            corruptedResult === null,
+            `Result: ${corruptedResult}\nExpected: null (corrupted data removed)`
+        );
+        
+        // Test 12: clear() removes all data
+        StorageManager.set('key1', 'value1');
+        StorageManager.set('key2', 'value2');
+        const clearResult = StorageManager.clear();
+        const afterClear1 = StorageManager.get('key1');
+        const afterClear2 = StorageManager.get('key2');
+        addResult(
+            'Test 12: clear() removes all data',
+            clearResult === true && afterClear1 === null && afterClear2 === null,
+            `clear() returned: ${clearResult}\nget('key1'): ${afterClear1}\nget('key2'): ${afterClear2}\nExpected: all null`
+        );
+        
+        // Test 13: Complex nested object
+        const complexObj = {
+            user: {
+                name: 'Dany',
+                settings: {
+                    theme: 'dark',
+                    notifications: true
+                }
+            },
+            tasks: [
+                { id: 1, text: 'Task 1', completed: false },
+                { id: 2, text: 'Task 2', completed: true }
+            ]
+        };
+        StorageManager.set('complex', complexObj);
+        const retrievedComplex = StorageManager.get('complex');
+        const complexMatch = JSON.stringify(retrievedComplex) === JSON.stringify(complexObj);
+        addResult(
+            'Test 13: Complex nested object serialization',
+            complexMatch,
+            `Match: ${complexMatch}\nNested properties accessible: ${retrievedComplex?.user?.settings?.theme === 'dark'}`
+        );
+        
+        // Summary
+        const allSections = document.querySelectorAll('.test-section h2');
+        const passCount = document.querySelectorAll('.test-section h2.pass').length;
+        const failCount = document.querySelectorAll('.test-section h2.fail').length;
+        
+        const summary = document.createElement('div');
+        summary.className = 'test-section';
+        summary.style.backgroundColor = passCount === allSections.length ? '#d4edda' : '#f8d7da';
+        summary.innerHTML = `
+            <h2>Test Summary</h2>
+            <p><strong>Passed:</strong> ${passCount} / ${allSections.length}</p>
+            <p><strong>Failed:</strong> ${failCount} / ${allSections.length}</p>
+            <p><strong>Success Rate:</strong> ${Math.round((passCount / allSections.length) * 100)}%</p>
+        `;
+        results.insertBefore(summary, results.firstChild);
+        
+        console.log('StorageManager tests completed');
+        console.log(`Passed: ${passCount}, Failed: ${failCount}`);
+    </script>
+</body>
+</html>
